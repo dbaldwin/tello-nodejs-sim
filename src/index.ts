@@ -6,11 +6,13 @@ class Server {
   address: AddressInfo | null;
   server: dgram.Socket;
   listeningPort: number;
+  batteryPercentage: number;
 
   constructor() {
     this.address = null;
     this.server = dgram.createSocket("udp4");
     this.listeningPort = 8889;
+    this.batteryPercentage = 100;
 
     /**
      * Server error
@@ -36,9 +38,16 @@ class Server {
     this.server.on("message", (msg, rinfo) => {
       console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
 
+      let response = "ok";
+
+      if (msg.includes("battery?")) {
+        response = this.batteryPercentage.toString();
+        this.batteryPercentage--;
+      }
+
       // Respond back to client after 3 seconds
       setTimeout(() => {
-        new Client(rinfo.address, rinfo.port).respondOk();
+        new Client(rinfo.address, rinfo.port).respond(response);
       }, 3000);
     });
 
@@ -50,13 +59,11 @@ class Server {
 }
 
 class Client {
-  message: Buffer;
   client: dgram.Socket;
   address: string;
   sendPort: number;
 
   constructor(address: string, port: number) {
-    this.message = Buffer.from("ok");
     this.client = dgram.createSocket("udp4");
     this.address = address;
     this.sendPort = port;
@@ -65,10 +72,15 @@ class Client {
   /**
    * Send a reply back to address and port
    */
-  respondOk() {
-    this.client.send(this.message, this.sendPort, this.address, (err) => {
-      this.client.close();
-    });
+  respond(message: string) {
+    this.client.send(
+      Buffer.from(message),
+      this.sendPort,
+      this.address,
+      (err) => {
+        this.client.close();
+      }
+    );
   }
 }
 
