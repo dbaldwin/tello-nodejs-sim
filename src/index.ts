@@ -2,16 +2,18 @@ import dgram from "node:dgram";
 import { Buffer } from "node:buffer";
 import { AddressInfo } from "node:net";
 
-class Server {
+class CommandServer {
   address: AddressInfo | null;
   server: dgram.Socket;
-  listeningPort: number;
+  commandPort: number;
+  statePort: number;
   batteryPercentage: number;
 
   constructor() {
     this.address = null;
     this.server = dgram.createSocket("udp4");
-    this.listeningPort = 8889;
+    this.commandPort = 8889;
+    this.statePort = 8890;
     this.batteryPercentage = 100;
 
     /**
@@ -27,9 +29,19 @@ class Server {
      */
     this.server.on("listening", () => {
       this.address = this.server.address();
+
       console.log(
         `server listening ${this.address.address}:${this.address.port}`
       );
+
+      let test = this.address.address;
+
+      // Start sending state packets
+      setInterval(() => {
+        new Client(this.address!.address, this.statePort).respond(
+          DroneState.getState(this.batteryPercentage)
+        );
+      }, 1000);
     });
 
     /**
@@ -41,8 +53,12 @@ class Server {
       let response = "ok";
 
       if (msg.includes("battery?")) {
+        this.batteryPercentage = this.batteryPercentage - 1;
         response = this.batteryPercentage.toString();
-        this.batteryPercentage--;
+
+        // Reset the battery
+        this.batteryPercentage =
+          this.batteryPercentage < 1 ? 100 : this.batteryPercentage;
       }
 
       // Respond back to client after 3 seconds
@@ -54,7 +70,7 @@ class Server {
     /**
      * Server listens on port
      */
-    this.server.bind(this.listeningPort);
+    this.server.bind(this.commandPort);
   }
 }
 
@@ -84,4 +100,18 @@ class Client {
   }
 }
 
-const server = new Server();
+class DroneState {
+  static getState(battery: number) {
+    let state = `mid:${this.random(
+      1,
+      8
+    )};x:0;y:0;z:0;mpry:0,0,0;pitch:1;roll:0;yaw:0;vgx:0;vgy:0;vgz:0;templ:66;temph:67;tof:10;h:0;bat:${battery};baro:328.69;time:0;agx:21.00;agy:15.00;agz:-1004.00;`;
+    return state;
+  }
+
+  static random(start: number, end: number) {
+    return Math.floor(Math.random() * end) + start;
+  }
+}
+
+const commandServer = new CommandServer();
