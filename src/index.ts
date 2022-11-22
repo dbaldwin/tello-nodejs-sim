@@ -8,6 +8,7 @@ class CommandServer {
   commandPort: number;
   statePort: number;
   batteryPercentage: number;
+  telloStateLoop: ReturnType<typeof setInterval> | null;
 
   constructor() {
     this.address = null;
@@ -15,6 +16,7 @@ class CommandServer {
     this.commandPort = 8889;
     this.statePort = 8890;
     this.batteryPercentage = 100;
+    this.telloStateLoop = null;
 
     /**
      * Server error
@@ -33,15 +35,6 @@ class CommandServer {
       console.log(
         `server listening ${this.address.address}:${this.address.port}`
       );
-
-      let test = this.address.address;
-
-      // Start sending state packets
-      setInterval(() => {
-        new Client(this.address!.address, this.statePort).respond(
-          DroneState.getState(this.batteryPercentage)
-        );
-      }, 1000);
     });
 
     /**
@@ -65,6 +58,15 @@ class CommandServer {
       setTimeout(() => {
         new Client(rinfo.address, rinfo.port).respond(response);
       }, 3000);
+
+      // First connection let's start the state loop
+      if (!this.telloStateLoop) {
+        this.telloStateLoop = setInterval(() => {
+          new Client(rinfo.address, this.statePort).respond(
+            DroneState.getState(this.batteryPercentage)
+          );
+        }, 1000);
+      }
     });
 
     /**
